@@ -1,5 +1,11 @@
 Revision history for Apache::DBILogger
 
+0.84  Tue Jun  9 1998 ask
+	- Optimized the reconnect some
+	- Disabled the reconnect thingy
+	- Added logging of contenttype
+	- Added TRAPS section to documentation
+
 0.83  Tue May 26 1998 ask
 	- Retry and not just reconnect on connection loss
 

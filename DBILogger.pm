@@ -6,11 +6,13 @@ use Apache::Constants qw( :common );
 use DBI;
 use Date::Format;
 
-$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.14 $ =~ /(\d+)\.(\d+)/o);
-$Apache::DBILogger::VERSION = "0.83";
+$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.15 $ =~ /(\d+)\.(\d+)/o);
+	$Apache::DBILogger::VERSION = "0.84";
 
 sub reconnect($$) {
 	my ($dbhref, $r) = @_;
+
+	$$dbhref->disconnect;
 
 	$r->log_error("Reconnecting to DBI server");
 
@@ -24,23 +26,24 @@ sub reconnect($$) {
 
 sub logger {
 	my $r = shift;
- 
+
 	#$r->bytes_sent || return OK;
  
 	my $s = $r->server;
 	my $c = $r->connection;
 
 	my %data = (
-		'server'	=> $s->server_hostname,
- 		'bytes'		=> $r->bytes_sent,
-		'filename'	=> $r->filename,
-		'remotehost'=> $c->remote_host,
-		'remoteip'  => $c->remote_ip,
-		'status'    => $r->status,
-		'urlpath'	=> $r->uri,
-		'referer'	=> $r->header_in("Referer") || '',	
-    	'useragent'	=> $r->header_in('User-Agent'),
-    	'timeserved'=> time2str("%Y-%m-%d %X", time)
+		    'server'	=> $s->server_hostname,
+		    'bytes'     => $r->bytes_sent,
+		    'filename'	=> $r->filename || '',
+		    'remotehost'=> $c->remote_host || '',
+		    'remoteip'  => $c->remote_ip || '',
+		    'status'    => $r->status || '',
+		    'urlpath'	=> $r->uri || '',
+		    'referer'	=> $r->header_in("Referer") || '',	
+		    'useragent'	=> $r->header_in('User-Agent') || '',
+		    'timeserved'=> time2str("%Y-%m-%d %X", time),
+		    'contenttype' => $r->content_type || ''
 	);
 
 	if (my $user = $c->user) {
@@ -76,10 +79,10 @@ sub logger {
 
 	unless ($rv) {
 		$r->log_error("Apache::DBILogger had problems executing query ($statement): $DBI::errstr");
-		unless ($tries++ > 1) {
-			&reconnect(\$dbh, $r);
-			goto TRYAGAIN;
-		}
+	#	unless ($tries++ > 1) {
+	#		&reconnect(\$dbh, $r);
+	#		goto TRYAGAIN;
+	#	}
 	}
 	
 	$sth->finish;
@@ -93,7 +96,8 @@ sub logger {
 # #perl pun: <q[merlyn]> windows is for users who can't handle the power of the mac.
 
 sub handler { 
-	shift->post_connection(\&logger)
+	shift->post_connection(\&logger);
+	return OK;
 }
 
 1;
@@ -125,10 +129,11 @@ CREATE TABLE requests (
   status smallint(6) DEFAULT '0' NOT NULL,
   timeserved datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
   urlpath varchar(200) DEFAULT '' NOT NULL,
-  referer varchar(250),
+  referer varchar(250) DEFAULT '' NOT NULL,
   useragent varchar(250),
   PRIMARY KEY (id),
-  KEY server_idx (server)
+  KEY server_idx (server),
+  KEY timeserved_idx (timeserved)
 );
 
 Its recommended that you include
@@ -208,7 +213,7 @@ C<select count(id),sum(bytes)  from requests where server="www.company.com" and 
 
 =item hits and total bytes from www.company.com on mondays.
 
-C<select count(id),sum(bytes)  from requests where server="www.company.com" and dayofweek(timeserved) = 2>
+C<select count(id),sum(bytes) from requests where server="www.company.com" and dayofweek(timeserved) = 2>
 
 
 =back
@@ -218,12 +223,21 @@ so I would continue on
 
 http://www.tcx.se/Manual_chapter/manual_toc.html
 
+=head1 TRAPS
+
+I've experienced problems with 'Packets too large' when using 
+Apache::DBI, mysql and DBD::mysql 2.00 (from the Msql-mysql 1.18x packages).
+The DBD::mysql module from Msql-mysql 1.19_17 seems to work fine with 
+Apache::DBI.
+
 =head1 SUPPORT
 
 This module is supported via the mod_perl mailinglist (modperl@listproc.itribe.net).
 
 I would like to know which databases this module have been tested on, so please mail me
 if you try it.
+
+The latest version can be found on your local CPAN mirror or at C<ftp://ftp.netcetera.dk/pub/perl/>
 
 =head1 AUTHOR
 
