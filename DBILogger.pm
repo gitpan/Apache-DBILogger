@@ -6,8 +6,21 @@ use Apache::Constants qw( :common );
 use DBI;
 use Date::Format;
 
-$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.8 $ =~ /(\d+)\.(\d+)/o);
-$Apache::DBILogger::VERSION = "0.80";
+$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.10 $ =~ /(\d+)\.(\d+)/o);
+$Apache::DBILogger::VERSION = "0.81";
+
+sub reconnect($$) {
+	my ($dbhref, $r) = @_;
+
+	warn "Lost connection, reconnecting to DBI server";
+
+	$$dbhref = DBI->connect($r->dir_config("DBILogger_data_source"), $r->dir_config("DBILogger_username"), $r->dir_config("DBILogger_password"));
+  
+  	unless ($$dbhref) { 
+  		$r->log_error("Apache::DBILogger could not connect to ".$r->dir_config("DBILogger_data_source")." - ".$DBI::errstr);
+  		return DECLINED;
+  	}
+}
 
 sub logger {
 	my $r = shift;
@@ -25,7 +38,7 @@ sub logger {
 		'remoteip'  => $c->remote_ip,
 		'status'    => $r->status,
 		'urlpath'	=> $r->uri,
-		'referer'	=> $r->header_in("Referer"),	
+		'referer'	=> $r->header_in("Referer") || '',	
     	'useragent'	=> $r->header_in('User-Agent'),
     	'timeserved'=> time2str("%Y-%m-%d %X", time)
 	);
@@ -59,7 +72,7 @@ sub logger {
   		return DECLINED;
   	}
 
-	my $rv = $sth->execute;  
+	my $rv = $sth->execute || &reconnect(\$dbh, $r);
 	unless ($rv) {
 		$r->log_error("Apache::DBILogger had problems executing query ($statement): $DBI::errstr");
 	}
