@@ -6,8 +6,8 @@ use Apache::Constants qw( :common );
 use DBI;
 use Date::Format;
 
-$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.19 $ =~ /(\d+)\.(\d+)/o);
-	$Apache::DBILogger::VERSION = "0.92";
+$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.20 $ =~ /(\d+)\.(\d+)/o);
+	$Apache::DBILogger::VERSION = "0.93";
 
 sub reconnect($$) {
 	my ($dbhref, $r) = @_;

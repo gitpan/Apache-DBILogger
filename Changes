@@ -1,5 +1,13 @@
 Revision history for Apache::DBILogger
 
+0.93  Thu Oct  8 1998 ask
+	- [webstat] Moved webstat.pl to webstat_mail.pl
+	- [webstat] Correct address in From: header
+	- [webstat] Added webstat_resolver.pl - a little script to resolve
+	            logrows without 'remotehost'
+	- [webstat] Now also lists the top 20 domains visiting the site
+	- [webstat] .. and other minor changes
+
 0.92  Wed Jul 29 1998 ask
 	- Added moverows.pl, webstat.pl and webstat.conf to the bin/
 	  directory.

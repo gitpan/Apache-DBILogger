@@ -26,10 +26,10 @@ while( my ($server, $serverconfig) = each %WebStat::Config::server) {
 
 	# setup a few useful dates
 	my %dates = (
-				 today     => time2str("%Y-%m-%e", time), 
-				 yesterday => time2str("%Y-%m-%e", time-(60*60*24)),
-				 weekago   => time2str("%Y-%m-%e", time-(60*60*24*7)),
-				 monthago  => time2str("%Y-%m-%e", time-(60*60*24*30))
+				 today     => time2str("%Y-%m-%d", time), 
+				 yesterday => time2str("%Y-%m-%d", time-(60*60*24)),
+				 weekago   => time2str("%Y-%m-%d", time-(60*60*24*7)),
+				 monthago  => time2str("%Y-%m-%d", time-(60*60*24*30))
 				 );
 
 	my %stats;
@@ -55,6 +55,8 @@ while( my ($server, $serverconfig) = each %WebStat::Config::server) {
 	  $stats{weekly}  = CountThings($dates{weekago}, $serverquery);
 	  $stats{monthly} = CountThings($dates{monthago}, $serverquery);
 	}
+
+
   # print or mail it ...
 	my $data;
 	$data .= "Statistics for $server";
@@ -62,21 +64,39 @@ while( my ($server, $serverconfig) = each %WebStat::Config::server) {
     $data .= " ($serverconfig->{description})" if $serverconfig->{description};
 	$data .= "\n";
 
-	my @datatimes = $opts{t} ? "today" : qw(daily weekly monthly);
-
 	# for the output below..
-    $dates{daily} = $dates{yesterday};
-    $dates{weekly} = $dates{weekago};
-    $dates{monthly} = $dates{monthago};
+	$dates{daily} = $dates{yesterday};
+	$dates{weekly} = $dates{weekago};
+	$dates{monthly} = $dates{monthago};
 
-	for my $time (@datatimes) { 
+	for my $time ($opts{t} ? "today" : qw(daily weekly monthly)) { 
 	  $data .= "\n$time (from $dates{$time})\n";
 	  $data .= sprintf("   % 3u users, % 5u hits % 8.0fKB\n", 
 					   $stats{$time}{usercount}, $stats{$time}{hits}, $stats{$time}{traffic});
 	  #$data .= "     $stats{$time}{pagehits} pageviews ($stats{$time}{pagetraffic}KB)\n";
 	}
 
-    $data .= "\n\n";
+    $data .= "\n";
+	
+	my $timequery;
+	unless ($opts{t}) {
+	  $timequery = qq[(timeserved >= "$dates{yesterday}" and timeserved < "$dates{today}")];
+	} else {
+	  $timequery = qq[(timeserved >= "$dates{today}")];
+	}
+
+	
+	$data .= "\nTop 20 domains visiting the site:\n";
+	$data .= "   Hits  Domain\n";
+	my $sqlcommand = qq[select substring(remotehost,locate(".",remotehost)+1,100) as subdims,\
+						remoteip,count(remotehost) as c from $WebStat::Config::database{"table"} \
+						where $serverquery and $timequery group by subdims order by c DESC LIMIT 20];
+	print "sqlcommand: $sqlcommand\n" if $opts{d};
+	my $sth = DoSql($sqlcommand);
+	while (my ($subhost, $remoteip, $count) = $sth->fetchrow) {
+	  $subhost = "unresolved" unless ($subhost);
+	  $data .= sprintf("  % 5u: %s\n", $count, $subhost);
+	}
 
 	print "$data" unless ($opts{M});  
 
@@ -90,11 +110,10 @@ while( my ($server, $serverconfig) = each %WebStat::Config::server) {
 				: @{$serverconfig->{mail}->{rcpt}}; 
 	  $smtp->to(@mailto); 
 	  $smtp->data();
-	  $smtp->datasend("From: netpasser\@netcetera.dk\n");
+	  $smtp->datasend("From: $mailfrom\n");
 	  $smtp->datasend("To: ". join (", ", @mailto)."\n" );
 	  $smtp->datasend("Subject: Webstats for $server (". time2str("%Y-%m-%e", time) .")\n\n");
-	  $smtp->datasend($data);
-      $smtp->datasend("Send kommentarer til ask\@netcetera.dk\n");
+	  $smtp->datasend("$data\n");
 	  $smtp->dataend();
 	  $smtp->quit;
 	}
@@ -124,7 +143,7 @@ sub CountThings {
 				  and $timequery]);
   ($stat{hits}, $stat{traffic}) = $sth->fetchrow;
   
- ## pageviews (don't do it - the contenttype is wrong far too often)
+ ## pageviews
  # $sth = DoSql(qq[select count(server),sum(bytes)/1024 from $table where $serverquery 
  #				  and $timequery
  #				  and (contenttype = 'text/plain' or contenttype = 'text/html')]);
@@ -182,7 +201,7 @@ sub readconfigfile {
 }
 
 
-# count hits and trafic
+# count hits and traffic
 #	 select count(bytes) as hits,sum(bytes) as trafik,server from requests group by server order by hits limit 20 ;
 
 
