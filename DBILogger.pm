@@ -6,8 +6,8 @@ use Apache::Constants qw( :common );
 use DBI;
 use Date::Format;
 
-$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.6 $ =~ /(\d+)\.(\d+)/o);
-$Apache::DBILogger::VERSION = "0.20";
+$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.8 $ =~ /(\d+)\.(\d+)/o);
+$Apache::DBILogger::VERSION = "0.80";
 
 sub logger {
 	my $r = shift;
@@ -49,13 +49,30 @@ sub logger {
 	}
 	
 	my $statement = "insert into requests (". join(',', keys %data) .") VALUES (". join(',', @valueslist) .")";
+
+	#my $rv = $dbh->do($statement);
   
-	my $rv = $dbh->do($statement);
+  	my $sth = $dbh->prepare($statement);
+  	
+  	unless ($sth) {
+  		$r->log_error("Apache::DBILogger could not prepare sql query ($statement): $DBI::errstr");	
+  		return DECLINED;
+  	}
+
+	my $rv = $sth->execute;  
+	unless ($rv) {
+		$r->log_error("Apache::DBILogger had problems executing query ($statement): $DBI::errstr");
+	}
+	
+	$sth->finish;
+
 
 	$dbh->disconnect;
 
 	OK; 
 }
+
+# #perl pun: <q[merlyn]> windows is for users who can't handle the power of the mac.
 
 sub handler { 
 	shift->post_connection(\&logger)
@@ -108,9 +125,10 @@ further information.
 =head1 DESCRIPTION
 
 This module tracks what's being transfered by the Apache web server in a 
-SQL database (everything with a DBI/DBD driver).  This allows for 
-real-time statistics (of almost everything) without having to parse the log
-files (like the Apache::Traffic module, just in a "real" database).
+SQL database (everything with a DBI/DBD driver).  This allows to get 
+statistics (of almost everything) without having to parse the log
+files (like the Apache::Traffic module, just in a "real" database, and with
+a lot more logged information).
 
 After installation, follow the instructions in the synopsis and restart 
 the server.

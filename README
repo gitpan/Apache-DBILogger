@@ -10,7 +10,9 @@ To build and install it, please run
 This package is Copyright (C) 1998 by Ask Bjørn Hansen. It may
 be copied, used and redistributed under the same terms as perl itself.
 
-Please install and 'perldoc Apache::DBILogger' for more information.
+Install and 'perldoc Apache::DBILogger' for more information.
+
+
 
 
 Happy Perl'ng,
