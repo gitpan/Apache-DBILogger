@@ -1,5 +1,10 @@
 Revision history for Apache::DBILogger
 
+0.20  Sun Mar 22 1998
+	- Updated documentation
+	- Added error handling in the connect stage. (Wow, 'safe' programming ...)
+	- More testing	
+
 0.01  Thu Mar 12 1998
 	- original version
 

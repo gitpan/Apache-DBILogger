@@ -6,8 +6,8 @@ use Apache::Constants qw( :common );
 use DBI;
 use Date::Format;
 
-$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.4 $ =~ /(\d+)\.(\d+)/o);
-$Apache::DBILogger::VERSION = "0.01";
+$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.6 $ =~ /(\d+)\.(\d+)/o);
+$Apache::DBILogger::VERSION = "0.20";
 
 sub logger {
 	my $r = shift;
@@ -36,6 +36,11 @@ sub logger {
 
 	my $dbh = DBI->connect($r->dir_config("DBILogger_data_source"), $r->dir_config("DBILogger_username"), $r->dir_config("DBILogger_password"));
   
+  	unless ($dbh) { 
+  		$r->log_error("Apache::DBILogger could not connect to ".$r->dir_config("DBILogger_data_source")." - ".$DBI::errstr);
+  		return DECLINED;
+  	}
+  	
   	my @valueslist;
   	
   	foreach (keys %data) {
@@ -143,28 +148,46 @@ so you're on your own.  :-)
 
 For a start try:
 
-# hit count and total bytes transfered from the virtual server www.company.com
-select count(id),sum(bytes) from requests where server="www.company.com";
+=over 4
 
-# hit count and total bytes from all servers, ordered by number of hits
-select server,count(id) as hits,sum(bytes) from requests 
-group by server order by hits desc;
+=item hit count and total bytes transfered from the virtual server www.company.com
 
-# count of hits from macintosh users
-select count(id) from requests where useragent like "%Mac%" ;
+C<select count(id),sum(bytes) from requests where server="www.company.com">
 
-# hits and total bytes in the last 30 days from www.company.com 
-select count(id),sum(bytes)  from requests where server="www.company.com"
-and TO_DAYS(NOW()) - TO_DAYS(timeserved) <= 30 ;
 
-# hits and total bytes from www.company.com on mondays.
-select count(id),sum(bytes)  from requests where server="www.company.com"
-and dayofweek(timeserved) = 2;
+=item hit count and total bytes from all servers, ordered by number of hits
+ 
+C<select server,count(id) as hits,sum(bytes) from requests group by server order by hits desc>
+
+
+=item count of hits from macintosh users
+
+C<select count(id) from requests where useragent like "%Mac%">
+
+
+=item hits and total bytes in the last 30 days
+
+C<select count(id),sum(bytes)  from requests where server="www.company.com" and TO_DAYS(NOW()) - TO_DAYS(timeserved) <= 30>
+
+
+=item hits and total bytes from www.company.com on mondays.
+
+C<select count(id),sum(bytes)  from requests where server="www.company.com" and dayofweek(timeserved) = 2>
+
+
+=back
 
 See your sql server documentation of more examples. I'm a happy mySQL user,
 so I would continue on 
 
 http://www.tcx.se/Manual_chapter/manual_toc.html
+
+=head1 SUPPORT
+
+This module is supported via the mod_perl mailinglist (modperl@listproc.itribe.net).
+
+I would like to know which databases this module have been tested on, so please mail me
+if you try it.
 
 =head1 AUTHOR
 
