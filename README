@@ -1,0 +1,18 @@
+The perl module Apache::DBILogger uses Apache mod_perl and the
+DBI/DBD modules to make Apache log accesses to a database.
+
+To build and install it, please run
+
+    perl Makefile.PL
+    make
+    make install
+
+This package is Copyright (C) 1998 by Ask Bjørn Hansen. It may
+be copied, used and redistributed under the same terms as perl itself.
+
+Please install and 'perldoc Apache::DBILogger' for more information.
+
+
+Happy Perl'ng,
+
+ask@netcetera.dk
