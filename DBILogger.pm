@@ -6,13 +6,13 @@ use Apache::Constants qw( :common );
 use DBI;
 use Date::Format;
 
-$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.11 $ =~ /(\d+)\.(\d+)/o);
-$Apache::DBILogger::VERSION = "0.82";
+$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.14 $ =~ /(\d+)\.(\d+)/o);
+$Apache::DBILogger::VERSION = "0.83";
 
 sub reconnect($$) {
 	my ($dbhref, $r) = @_;
 
-	$r->log_error("Lost connection, reconnecting to DBI server");
+	$r->log_error("Reconnecting to DBI server");
 
 	$$dbhref = DBI->connect($r->dir_config("DBILogger_data_source"), $r->dir_config("DBILogger_username"), $r->dir_config("DBILogger_password"));
   
@@ -63,18 +63,23 @@ sub logger {
 	
 	my $statement = "insert into requests (". join(',', keys %data) .") VALUES (". join(',', @valueslist) .")";
 
-	#my $rv = $dbh->do($statement);
-  
-  	my $sth = $dbh->prepare($statement);
+	my $tries = 0;
+	
+  	TRYAGAIN: my $sth = $dbh->prepare($statement);
   	
   	unless ($sth) {
   		$r->log_error("Apache::DBILogger could not prepare sql query ($statement): $DBI::errstr");	
   		return DECLINED;
   	}
 
-	my $rv = $sth->execute || &reconnect(\$dbh, $r);
+	my $rv = $sth->execute;
+
 	unless ($rv) {
 		$r->log_error("Apache::DBILogger had problems executing query ($statement): $DBI::errstr");
+		unless ($tries++ > 1) {
+			&reconnect(\$dbh, $r);
+			goto TRYAGAIN;
+		}
 	}
 	
 	$sth->finish;
@@ -82,7 +87,7 @@ sub logger {
 
 	$dbh->disconnect;
 
-	OK; 
+	OK;
 }
 
 # #perl pun: <q[merlyn]> windows is for users who can't handle the power of the mac.

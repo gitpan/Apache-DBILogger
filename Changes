@@ -1,5 +1,8 @@
 Revision history for Apache::DBILogger
 
+0.83  Tue May 26 1998 ask
+	- Retry and not just reconnect on connection loss
+
 0.82  Sat May 23 1998 ask
 	- Oops, 'warn' should be $r->log_error
 
