@@ -5,10 +5,9 @@ use strict;
 use Apache::Constants qw( :common );
 use DBI;
 use Date::Format;
-use CGI::Cookie;
 
-$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.18 $ =~ /(\d+)\.(\d+)/o);
-	$Apache::DBILogger::VERSION = "0.91";
+$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.19 $ =~ /(\d+)\.(\d+)/o);
+	$Apache::DBILogger::VERSION = "0.92";
 
 sub reconnect($$) {
 	my ($dbhref, $r) = @_;
@@ -26,10 +25,8 @@ sub reconnect($$) {
 }
 
 sub logger {
-	my $r = shift;
+	my $r = shift->last;
 
-	#$r->bytes_sent || return OK;
- 
 	my $s = $r->server;
 	my $c = $r->connection;
 
@@ -51,10 +48,7 @@ sub logger {
 		$data{user} = $user;
 	}
 
-	if (my %cookies = fetch CGI::Cookie) {
-	  my $usertrack = $cookies{'Apache'}->value;  
-	  $data{usertrack} = $usertrack if ($usertrack);
-	};
+	$data{usertrack} = $r->notes('cookie') || '';
 
 	my $dbh = DBI->connect($r->dir_config("DBILogger_data_source"), $r->dir_config("DBILogger_username"), $r->dir_config("DBILogger_password"));
   
@@ -130,17 +124,17 @@ Create a database with a table named B<requests> like this:
 CREATE TABLE requests (
   server varchar(127) DEFAULT '' NOT NULL,
   bytes mediumint(9) DEFAULT '0' NOT NULL,
-  user varchar(15),
-  filename varchar(200),
-  remotehost varchar(150),
+  user varchar(15) DEFAULT '' NOT NULL,
+  filename varchar(200) DEFAULT '' NOT NULL,
+  remotehost varchar(150) DEFAULT '' NOT NULL,
   remoteip varchar(15) DEFAULT '' NOT NULL,
   status smallint(6) DEFAULT '0' NOT NULL,
   timeserved datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+  contenttype varchar(50) DEFAULT '' NOT NULL,
   urlpath varchar(200) DEFAULT '' NOT NULL,
   referer varchar(250) DEFAULT '' NOT NULL,
   useragent varchar(250) DEFAULT '' NOT NULL,
   usertrack varchar(100) DEFAULT '' NOT NULL,
-  PRIMARY KEY (id),
   KEY server_idx (server),
   KEY timeserved_idx (timeserved)
 );
@@ -195,8 +189,8 @@ file so it knows to use Apache::DBILogger during the logging phase.
 
 =head1 VIEWING STATISTICS
 
-Please see the examples/ directory in the distribution for a
-statistics script. 
+Please see the bin/ directory in the distribution for a
+statistics script.
 
 Some funny examples on what you can do might include:
 
@@ -256,6 +250,8 @@ like this:
   insert into requests select * from requests_insert
   delete from requests_insert
   UNLOCK TABLES
+
+You can use the moverows.pl script from the bin/ directory.
 
 Please note that this won't work if you have any unique id field!
 You'll get duplicates and your new rows won't be inserted, just

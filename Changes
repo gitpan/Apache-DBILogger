@@ -1,5 +1,14 @@
 Revision history for Apache::DBILogger
 
+0.92  Wed Jul 29 1998 ask
+	- Added moverows.pl, webstat.pl and webstat.conf to the bin/
+	  directory.
+	- Fixed some flaws in the table defination in the pod section.
+	  (thanks to Lupe Christoph)
+	- Now sets $r to shift->last. This should stop the problems with
+	  a wrong contenttype being logged.
+	- Gets the usertrack cookie from $r->notes.
+
 0.91  Sat Jun 20 1998 ask
 	- If the 'Apache' cookie is set (from mod_usertrack) then 
 	  log it to the 'usertrack' field.

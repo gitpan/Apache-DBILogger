@@ -4,3 +4,6 @@ MANIFEST
 Makefile.PL
 test.pl
 README
+bin/moverows.pl
+bin/webstat.conf
+bin/webstat.pl
