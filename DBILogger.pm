@@ -5,9 +5,10 @@ use strict;
 use Apache::Constants qw( :common );
 use DBI;
 use Date::Format;
+use CGI::Cookie;
 
-$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.15 $ =~ /(\d+)\.(\d+)/o);
-	$Apache::DBILogger::VERSION = "0.84";
+$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.18 $ =~ /(\d+)\.(\d+)/o);
+	$Apache::DBILogger::VERSION = "0.91";
 
 sub reconnect($$) {
 	my ($dbhref, $r) = @_;
@@ -50,6 +51,11 @@ sub logger {
 		$data{user} = $user;
 	}
 
+	if (my %cookies = fetch CGI::Cookie) {
+	  my $usertrack = $cookies{'Apache'}->value;  
+	  $data{usertrack} = $usertrack if ($usertrack);
+	};
+
 	my $dbh = DBI->connect($r->dir_config("DBILogger_data_source"), $r->dir_config("DBILogger_username"), $r->dir_config("DBILogger_password"));
   
   	unless ($dbh) { 
@@ -63,8 +69,10 @@ sub logger {
 		$data{$_} = $dbh->quote($data{$_});
 		push @valueslist, $data{$_};
 	}
-	
-	my $statement = "insert into requests (". join(',', keys %data) .") VALUES (". join(',', @valueslist) .")";
+
+	my $table = $r->dir_config("DBILogger_table") || 'requests';
+
+	my $statement = "insert into $table (". join(',', keys %data) .") VALUES (". join(',', @valueslist) .")";
 
 	my $tries = 0;
 	
@@ -115,11 +123,11 @@ Apache::DBILogger - Tracks what's being transferred in a DBI database
   PerlSetVar DBILogger_data_source    DBI:mysql:httpdlog
   PerlSetVar DBILogger_username       httpduser
   PerlSetVar DBILogger_password       secret
+  PerlSetvar DBILogger_table          requests
   
 Create a database with a table named B<requests> like this:
 
 CREATE TABLE requests (
-  id mediumint(9) DEFAULT '0' NOT NULL auto_increment,
   server varchar(127) DEFAULT '' NOT NULL,
   bytes mediumint(9) DEFAULT '0' NOT NULL,
   user varchar(15),
@@ -130,7 +138,8 @@ CREATE TABLE requests (
   timeserved datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
   urlpath varchar(200) DEFAULT '' NOT NULL,
   referer varchar(250) DEFAULT '' NOT NULL,
-  useragent varchar(250),
+  useragent varchar(250) DEFAULT '' NOT NULL,
+  usertrack varchar(100) DEFAULT '' NOT NULL,
   PRIMARY KEY (id),
   KEY server_idx (server),
   KEY timeserved_idx (timeserved)
@@ -152,6 +161,8 @@ SQL database (everything with a DBI/DBD driver).  This allows to get
 statistics (of almost everything) without having to parse the log
 files (like the Apache::Traffic module, just in a "real" database, and with
 a lot more logged information).
+
+Apache::DBILogger will track the cookie from 'mod_usertrack' if it's there.
 
 After installation, follow the instructions in the synopsis and restart 
 the server.
@@ -184,66 +195,98 @@ file so it knows to use Apache::DBILogger during the logging phase.
 
 =head1 VIEWING STATISTICS
 
-I haven't made any pretty scripts og web interfaces to the log-database yet,
-so you're on your own.  :-)
+Please see the examples/ directory in the distribution for a
+statistics script. 
 
-For a start try:
+Some funny examples on what you can do might include:
 
 =over 4
 
 =item hit count and total bytes transfered from the virtual server www.company.com
 
-C<select count(id),sum(bytes) from requests where server="www.company.com">
-
+    select count(id),sum(bytes) from requests 
+    where server="www.company.com"
 
 =item hit count and total bytes from all servers, ordered by number of hits
- 
-C<select server,count(id) as hits,sum(bytes) from requests group by server order by hits desc>
 
+    select server,count(id) as hits,sum(bytes) from requests
+    group by server order by hits desc
 
 =item count of hits from macintosh users
 
-C<select count(id) from requests where useragent like "%Mac%">
-
+    select count(id) from requests where useragent like "%Mac%"
 
 =item hits and total bytes in the last 30 days
+    select count(id),sum(bytes) from requests where
+    server="www.company.com" and TO_DAYS(NOW()) -
+    TO_DAYS(timeserved) <= 30
 
-C<select count(id),sum(bytes)  from requests where server="www.company.com" and TO_DAYS(NOW()) - TO_DAYS(timeserved) <= 30>
+This is pretty unoptimal.  It would be faster to calculate the dates
+in perl and write them in the sql query using f.x. Date::Format.
 
 
 =item hits and total bytes from www.company.com on mondays.
 
-C<select count(id),sum(bytes) from requests where server="www.company.com" and dayofweek(timeserved) = 2>
-
+    select count(id),sum(bytes) from requests where
+    server="www.company.com" and dayofweek(timeserved) = 2
 
 =back
 
-See your sql server documentation of more examples. I'm a happy mySQL user,
-so I would continue on 
+It's often pretty interesting to view the referer info too.
+
+See your sql server documentation of more examples. I'm a happy mySQL
+user, so I would continue on
 
 http://www.tcx.se/Manual_chapter/manual_toc.html
 
+=head1 LOCKING ISSUES
+
+MySQL 'read locks' the table when you do a select. On a big table
+(like a large httpdlog) this might take a while, where your httpds
+can't insert new logentries, which will make them 'hang' until the
+select is done.
+
+One way to work around this is to create another table
+(f.x. requests_insert) and get the httpd's to insert to this table.
+
+Then run a script from crontab once in a while which does something
+like this:
+
+  LOCK TABLES requests WRITE, requests_insert WRITE
+  insert into requests select * from requests_insert
+  delete from requests_insert
+  UNLOCK TABLES
+
+Please note that this won't work if you have any unique id field!
+You'll get duplicates and your new rows won't be inserted, just
+deleted. Be careful.
+
 =head1 TRAPS
 
-I've experienced problems with 'Packets too large' when using 
-Apache::DBI, mysql and DBD::mysql 2.00 (from the Msql-mysql 1.18x packages).
-The DBD::mysql module from Msql-mysql 1.19_17 seems to work fine with 
-Apache::DBI.
+I've experienced problems with 'Packets too large' when using
+Apache::DBI, mysql and DBD::mysql 2.00 (from the Msql-mysql 1.18x
+packages).  The DBD::mysql module from Msql-mysql 1.19_17 seems to
+work fine with Apache::DBI.
+
+You might get problems with Apache 1.2.x. (Not supporting
+post_connection?)
 
 =head1 SUPPORT
 
-This module is supported via the mod_perl mailinglist (modperl@listproc.itribe.net).
+This module is supported via the mod_perl mailinglist
+(modperl@apache.org, subscribe by sending a mail to
+modperl-request@apache.org).
 
-I would like to know which databases this module have been tested on, so please mail me
-if you try it.
+I would like to know which databases this module have been tested on,
+so please mail me if you try it.
 
-The latest version can be found on your local CPAN mirror or at C<ftp://ftp.netcetera.dk/pub/perl/>
+The latest version can be found on your local CPAN mirror or at
+C<ftp://ftp.netcetera.dk/pub/perl/>
 
 =head1 AUTHOR
 
-Copyright (C) 1998, Ask Bjoern Hansen <ask@netcetera.dk>. All rights reserved.
-
-This module is free software; you may redistribute it and/or
+Copyright (C) 1998, Ask Bjoern Hansen <ask@netcetera.dk>. All rights
+reserved. This module is free software; you may redistribute it and/or
 modify it under the same terms as Perl itself.
 
 =head1 SEE ALSO
