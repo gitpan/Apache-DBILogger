@@ -1,20 +1,23 @@
 Revision history for Apache::DBILogger
 
-0.81  Tue May 19 1998
+0.82  Sat May 23 1998 ask
+	- Oops, 'warn' should be $r->log_error
+
+0.81  Tue May 19 1998 ask
 	- Adding '' and not NULL as referer if none is found
 	- Added a little reconnect function (trying to get rid of these
 	  annoying Lost connection messages).
 
-0.80  Sun May  5 1998
+0.80  Sun May  5 1998 ask
 	- Changed dbh->do to ->prepare, ->execute to beable to log more
 	  errors.
 
-0.20  Sun Mar 22 1998
+0.20  Sun Mar 22 1998 ask
 	- Updated documentation
 	- Added error handling in the connect stage. (Wow, 'safe'
 	  programming ...)
 	- More testing	
 
-0.01  Thu Mar 12 1998
+0.01  Thu Mar 12 1998 ask
 	- original version
 

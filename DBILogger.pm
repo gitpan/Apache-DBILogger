@@ -6,13 +6,13 @@ use Apache::Constants qw( :common );
 use DBI;
 use Date::Format;
 
-$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.10 $ =~ /(\d+)\.(\d+)/o);
-$Apache::DBILogger::VERSION = "0.81";
+$Apache::DBILogger::revision = sprintf("%d.%02d", q$Revision: 1.11 $ =~ /(\d+)\.(\d+)/o);
+$Apache::DBILogger::VERSION = "0.82";
 
 sub reconnect($$) {
 	my ($dbhref, $r) = @_;
 
-	warn "Lost connection, reconnecting to DBI server";
+	$r->log_error("Lost connection, reconnecting to DBI server");
 
 	$$dbhref = DBI->connect($r->dir_config("DBILogger_data_source"), $r->dir_config("DBILogger_username"), $r->dir_config("DBILogger_password"));
   
